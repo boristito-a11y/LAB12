@@ -4,163 +4,168 @@ namespace App\Http\Controllers\Usuario;
 
 use App\Http\Controllers\Controller;
 use App\Models\Vehiculo;
-use Illuminate\Http\Request;
+use App\Models\CarritoItem;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class CarritoController extends Controller
 {
-    private function keyCarrito(): string
-    {
-        return 'carrito_' . Auth::id();
-    }
-
     public function index()
     {
-        $carrito = session()->get($this->keyCarrito(), []);
-        $total   = collect($carrito)->sum(fn($item) => $item['precio'] * $item['cantidad']);
+        $items   = CarritoItem::with('vehiculo.marca')->where('user_id', Auth::id())->get();
+        $carrito = $this->itemsToArray($items);
+        $total   = collect($carrito)->sum(fn($i) => $i['precio'] * $i['cantidad']);
         return view('usuario.carrito.index', compact('carrito', 'total'));
     }
 
     public function agregar(Vehiculo $vehiculo)
     {
-        $vehiculo->refresh(); // stock real de la BD
+        $stockActual = DB::table('vehiculos')->where('id', $vehiculo->id)->value('stock');
 
-        if ($vehiculo->stock <= 0) {
+        if ($stockActual <= 0) {
             return redirect()->back()->with('error', 'Este vehículo no tiene stock disponible.');
         }
 
-        $key           = $this->keyCarrito();
-        $carrito       = session()->get($key, []);
-        $cantEnCarrito = isset($carrito[$vehiculo->id]) ? $carrito[$vehiculo->id]['cantidad'] : 0;
+        DB::table('vehiculos')->where('id', $vehiculo->id)->decrement('stock');
 
-        if ($cantEnCarrito >= $vehiculo->stock) {
-            return redirect()->back()->with('error', 'No hay más unidades disponibles.');
-        }
+        $item = CarritoItem::where('user_id', Auth::id())
+                           ->where('vehiculo_id', $vehiculo->id)
+                           ->first();
 
-        // Descontar 1 del stock en BD
-        DB::transaction(function () use ($vehiculo) {
-            $vehiculo->decrement('stock');
-        });
-
-        if (isset($carrito[$vehiculo->id])) {
-            $carrito[$vehiculo->id]['cantidad']++;
+        if ($item) {
+            $item->increment('cantidad');
         } else {
-            $carrito[$vehiculo->id] = [
-                'id'       => $vehiculo->id,
-                'nombre'   => $vehiculo->modelo . ' ' . $vehiculo->marca->nombre,
-                'precio'   => $vehiculo->precio,
-                'cantidad' => 1,
-                'foto'     => $vehiculo->foto,
-                'stock'    => $vehiculo->stock,
-            ];
+            CarritoItem::create([
+                'user_id'     => Auth::id(),
+                'vehiculo_id' => $vehiculo->id,
+                'cantidad'    => 1,
+            ]);
         }
 
-        session()->put($key, $carrito);
         return redirect()->back()->with('success', 'Vehículo agregado al carrito.');
     }
 
     public function incrementar($id)
     {
-        $key     = $this->keyCarrito();
-        $carrito = session()->get($key, []);
+        $item = CarritoItem::where('user_id', Auth::id())
+                           ->where('vehiculo_id', $id)->first();
 
-        if (!isset($carrito[$id])) {
-            return redirect()->route('usuario.carrito.index');
-        }
+        if (!$item) return redirect()->route('usuario.carrito.index');
 
-        $vehiculo = Vehiculo::find($id);
+        $stockActual = DB::table('vehiculos')->where('id', $id)->value('stock');
 
-        if (!$vehiculo || $vehiculo->stock <= 0) {
+        if ($stockActual <= 0) {
             return redirect()->route('usuario.carrito.index')
                 ->with('error', 'No hay más unidades disponibles.');
         }
 
-        DB::transaction(function () use ($vehiculo) {
-            $vehiculo->decrement('stock');
-        });
-
-        $carrito[$id]['cantidad']++;
-        session()->put($key, $carrito);
+        DB::table('vehiculos')->where('id', $id)->decrement('stock');
+        $item->increment('cantidad');
 
         return redirect()->route('usuario.carrito.index');
     }
 
     public function decrementar($id)
     {
-        $key     = $this->keyCarrito();
-        $carrito = session()->get($key, []);
+        $item = CarritoItem::where('user_id', Auth::id())
+                           ->where('vehiculo_id', $id)->first();
 
-        if (!isset($carrito[$id])) {
-            return redirect()->route('usuario.carrito.index');
-        }
+        if (!$item) return redirect()->route('usuario.carrito.index');
 
-        // Devolver 1 al stock en BD
-        DB::transaction(function () use ($id) {
-            Vehiculo::where('id', $id)->increment('stock');
-        });
+        DB::table('vehiculos')->where('id', $id)->increment('stock');
 
-        if ($carrito[$id]['cantidad'] > 1) {
-            $carrito[$id]['cantidad']--;
+        if ($item->cantidad > 1) {
+            $item->decrement('cantidad');
         } else {
-            unset($carrito[$id]);
+            $item->delete();
         }
 
-        session()->put($key, $carrito);
         return redirect()->route('usuario.carrito.index');
     }
 
     public function eliminar($id)
     {
-        $key     = $this->keyCarrito();
-        $carrito = session()->get($key, []);
+        $item = CarritoItem::where('user_id', Auth::id())
+                           ->where('vehiculo_id', $id)->first();
 
-        if (isset($carrito[$id])) {
-            $cantidad = $carrito[$id]['cantidad'];
-
-            // Devolver TODAS las unidades al stock en BD
-            DB::transaction(function () use ($id, $cantidad) {
-                Vehiculo::where('id', $id)->increment('stock', $cantidad);
-            });
-
-            unset($carrito[$id]);
-            session()->put($key, $carrito);
+        if ($item) {
+            DB::table('vehiculos')->where('id', $id)->increment('stock', $item->cantidad);
+            $item->delete();
         }
 
-        return redirect()->route('usuario.carrito.index')->with('success', 'Ítem eliminado del carrito.');
+        return redirect()->route('usuario.carrito.index')
+            ->with('success', 'Ítem eliminado del carrito.');
     }
 
     public function vaciar()
     {
-        $key     = $this->keyCarrito();
-        $carrito = session()->get($key, []);
+        $items = CarritoItem::where('user_id', Auth::id())->get();
 
-        // Devolver todo el stock a la BD
-        DB::transaction(function () use ($carrito) {
-            foreach ($carrito as $id => $item) {
-                Vehiculo::where('id', $id)->increment('stock', $item['cantidad']);
-            }
-        });
+        foreach ($items as $item) {
+            DB::table('vehiculos')->where('id', $item->vehiculo_id)
+                                  ->increment('stock', $item->cantidad);
+        }
 
-        session()->forget($key);
-        return redirect()->route('usuario.carrito.index')->with('success', 'Carrito vaciado correctamente.');
+        CarritoItem::where('user_id', Auth::id())->delete();
+
+        return redirect()->route('usuario.carrito.index')
+            ->with('success', 'Carrito vaciado correctamente.');
     }
 
     public function comprar()
     {
-        $key     = $this->keyCarrito();
-        $carrito = session()->get($key, []);
+        $items = CarritoItem::with('vehiculo.marca')->where('user_id', Auth::id())->get();
 
-        if (empty($carrito)) {
-            return redirect()->route('usuario.carrito.index')->with('error', 'Tu carrito está vacío.');
+        if ($items->isEmpty()) {
+            return redirect()->route('usuario.carrito.index')
+                ->with('error', 'Tu carrito está vacío.');
         }
 
-        $cantItems = collect($carrito)->sum('cantidad');
-        $total     = collect($carrito)->sum(fn($item) => $item['precio'] * $item['cantidad']);
+        $carrito   = $this->itemsToArray($items);
+        $cantItems = $items->sum('cantidad');
+        $total     = collect($carrito)->sum(fn($i) => $i['precio'] * $i['cantidad']);
 
-        // El stock ya fue descontado al agregar; solo vaciamos sesión
-        session()->forget($key);
+        $pedido = \App\Models\Pedido::create([
+            'user_id'        => Auth::id(),
+            'total'          => $total,
+            'cantidad_items' => $cantItems,
+        ]);
 
-        return view('usuario.carrito.confirmacion', compact('cantItems', 'total', 'carrito'));
+        foreach ($items as $item) {
+            $v      = $item->vehiculo;
+            $precio = ($v->en_oferta && $v->precio_oferta) ? $v->precio_oferta : $v->precio;
+
+            \App\Models\PedidoItem::create([
+                'pedido_id'   => $pedido->id,
+                'vehiculo_id' => $item->vehiculo_id,
+                'modelo'      => $v->modelo,
+                'marca'       => $v->marca->nombre,
+                'precio'      => $precio,
+                'cantidad'    => $item->cantidad,
+            ]);
+        }
+
+        CarritoItem::where('user_id', Auth::id())->delete();
+
+        return view('usuario.carrito.confirmacion', compact('cantItems', 'total', 'carrito', 'pedido'));
+    }
+
+    private function itemsToArray($items): array
+    {
+        $carrito = [];
+        foreach ($items as $item) {
+            $v      = $item->vehiculo;
+            $precio = ($v->en_oferta && $v->precio_oferta) ? $v->precio_oferta : $v->precio;
+            $carrito[$v->id] = [
+                'id'            => $v->id,
+                'nombre'        => $v->modelo . ' ' . $v->marca->nombre,
+                'precio'        => $precio,
+                'precio_normal' => $v->precio,
+                'en_oferta'     => $v->en_oferta && $v->precio_oferta,
+                'cantidad'      => $item->cantidad,
+                'foto'          => $v->foto,
+            ];
+        }
+        return $carrito;
     }
 }

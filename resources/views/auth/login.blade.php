@@ -334,6 +334,11 @@
                 Conexión cifrada y protegida
             </span>
         </div>
+
+        <p class="text-center mt-4" style="font-size:.88rem;color:#9ca3af">
+            ¿No tenés cuenta?
+            <a href="{{ route('registro') }}" style="color:#f59e0b;font-weight:600;text-decoration:none">Crear cuenta</a>
+        </p>
     </div>
 </div>
 

@@ -190,7 +190,11 @@
             Gracias por elegir <strong>AutoPremium</strong>.
         </p>
 
-        <a href="{{ route('usuario.vehiculos.index') }}" class="btn-back">
+        <a href="{{ route('usuario.pedidos.show', $pedido) }}" class="btn-back" style="background:linear-gradient(135deg,#059669,#047857)">
+            <i class="bi bi-bag-check"></i>
+            Ver mi pedido
+        </a>
+        <a href="{{ route('usuario.vehiculos.index') }}" class="btn-back mt-2" style="background:linear-gradient(135deg,#1a1a2e,#0f0f1a)">
             <i class="bi bi-grid-3x3-gap"></i>
             Seguir explorando
         </a>

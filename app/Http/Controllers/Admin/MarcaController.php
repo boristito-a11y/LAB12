@@ -10,7 +10,7 @@ class MarcaController extends Controller
 {
     public function index()
     {
-        $marcas = Marca::all();
+        $marcas = Marca::withCount('vehiculos')->get();
         return view('admin.marcas.index', compact('marcas'));
     }
 

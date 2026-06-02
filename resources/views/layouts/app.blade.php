@@ -11,7 +11,6 @@
         * { font-family: 'Inter', sans-serif; }
         body { background: #f0f2f5; min-height: 100vh; }
 
-        /* ── NAVBAR ── */
         .navbar-main {
             background: linear-gradient(135deg, #0f0f1a 0%, #1a1a2e 60%, #16213e 100%);
             padding: .75rem 0;
@@ -32,20 +31,18 @@
         .nav-link-custom:hover { background: rgba(255,255,255,.1); color: white !important; }
         .nav-link-custom.active { background: rgba(245,158,11,.15); color: #f59e0b !important; }
 
-        /* Badge carrito */
         .cart-badge {
             background: #ef4444; color: white; font-size: .65rem;
             font-weight: 700; padding: .15rem .45rem;
             border-radius: 99px; margin-left: .25rem;
         }
-
-        /* Botón usuario */
         .btn-user {
             background: rgba(255,255,255,.08);
             border: 1px solid rgba(255,255,255,.15);
             color: white; border-radius: 10px;
             padding: .4rem 1rem; font-size: .9rem;
-            font-weight: 500; transition: all .2s;
+            font-weight: 500; transition: all .2s; text-decoration: none;
+            display: inline-flex; align-items: center; gap: .4rem;
         }
         .btn-user:hover { background: rgba(255,255,255,.15); color: white; }
         .btn-logout {
@@ -57,10 +54,8 @@
         }
         .btn-logout:hover { background: rgba(239,68,68,.3); color: white; }
 
-        /* ── CONTENIDO ── */
         .main-content { padding: 2rem 0 3rem; }
 
-        /* Alertas */
         .alert-modern {
             border: none; border-radius: 12px; font-weight: 500;
             padding: 1rem 1.25rem;
@@ -76,31 +71,47 @@
 <nav class="navbar-main">
     <div class="container">
         <div class="d-flex align-items-center justify-content-between w-100">
-            <a class="navbar-brand-text" href="#">
+            <a class="navbar-brand-text" href="{{ auth()->user()->esAdmin() ? route('admin.dashboard') : route('usuario.vehiculos.index') }}">
                 <i class="bi bi-car-front-fill me-1"></i>Auto<span>Premium</span>
             </a>
 
             <div class="d-flex align-items-center gap-2">
                 @if(auth()->user()->esAdmin())
-                    <a class="nav-link-custom" href="{{ route('admin.marcas.index') }}">
+                    <a class="nav-link-custom {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}"
+                       href="{{ route('admin.dashboard') }}">
+                        <i class="bi bi-speedometer2"></i> Dashboard
+                    </a>
+                    <a class="nav-link-custom {{ request()->routeIs('admin.marcas.*') ? 'active' : '' }}"
+                       href="{{ route('admin.marcas.index') }}">
                         <i class="bi bi-tags"></i> Marcas
                     </a>
-                    <a class="nav-link-custom" href="{{ route('admin.vehiculos.index') }}">
+                    <a class="nav-link-custom {{ request()->routeIs('admin.vehiculos.*') ? 'active' : '' }}"
+                       href="{{ route('admin.vehiculos.index') }}">
                         <i class="bi bi-car-front"></i> Vehículos
                     </a>
                 @else
-                    <a class="nav-link-custom" href="{{ route('usuario.vehiculos.index') }}">
+                    <a class="nav-link-custom {{ request()->routeIs('usuario.vehiculos.*') ? 'active' : '' }}"
+                       href="{{ route('usuario.vehiculos.index') }}">
                         <i class="bi bi-grid-3x3-gap"></i> Catálogo
                     </a>
-                    <a class="nav-link-custom" href="{{ route('usuario.carrito.index') }}">
+                    <a class="nav-link-custom {{ request()->routeIs('usuario.favoritos.*') ? 'active' : '' }}"
+                       href="{{ route('usuario.favoritos.index') }}">
+                        <i class="bi bi-heart"></i> Favoritos
+                    </a>
+                    <a class="nav-link-custom {{ request()->routeIs('usuario.carrito.*') ? 'active' : '' }}"
+                       href="{{ route('usuario.carrito.index') }}">
                         <i class="bi bi-cart3"></i> Carrito
-                        @php $cant = collect(session('carrito_' . auth()->id(), []))->sum('cantidad'); @endphp
+                        @php $cant = \App\Models\CarritoItem::where('user_id', auth()->id())->sum('cantidad'); @endphp
                         @if($cant > 0)<span class="cart-badge">{{ $cant }}</span>@endif
+                    </a>
+                    <a class="nav-link-custom {{ request()->routeIs('usuario.pedidos.*') ? 'active' : '' }}"
+                       href="{{ route('usuario.pedidos.index') }}">
+                        <i class="bi bi-bag-check"></i> Mis Compras
                     </a>
                 @endif
 
                 <a class="btn-user ms-2" href="{{ route('perfil.edit') }}">
-                    <i class="bi bi-person-circle me-1"></i>{{ auth()->user()->name }}
+                    <i class="bi bi-person-circle"></i>{{ auth()->user()->name }}
                 </a>
 
                 <form action="{{ route('logout') }}" method="POST" class="d-inline m-0">

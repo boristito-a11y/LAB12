@@ -55,7 +55,12 @@
                 {{-- Nombre y precio --}}
                 <div class="flex-grow-1">
                     <p class="fw-bold mb-0" style="color:#1a1a2e">{{ $item['nombre'] }}</p>
-                    <p class="text-muted small mb-0">S/. {{ number_format($item['precio'], 2) }} c/u</p>
+                    @if($item['en_oferta'])
+                        <span class="text-muted small" style="text-decoration:line-through">S/. {{ number_format($item['precio_normal'], 2) }}</span>
+                        <p class="small mb-0 fw-semibold" style="color:#ef4444">S/. {{ number_format($item['precio'], 2) }} c/u 🔥</p>
+                    @else
+                        <p class="text-muted small mb-0">S/. {{ number_format($item['precio'], 2) }} c/u</p>
+                    @endif
                 </div>
 
                 {{-- Cantidad --}}

@@ -29,8 +29,8 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label">Stock *</label>
-                        <input type="number" name="stock" class="form-control @error('stock') is-invalid @enderror" 
-                            value="{{ old('stock', $vehiculo->stock ?? 10) }}" min="0">
+                        <input type="number" name="stock" class="form-control @error('stock') is-invalid @enderror"
+                            value="{{ old('stock', $vehiculo->stock) }}" min="0">
                         @error('stock')<div class="invalid-feedback">{{ $message }}</div>@enderror
                     </div>
                     <div class="mb-3">
@@ -59,6 +59,21 @@
                         @endif
                         <input type="file" name="foto" class="form-control mt-2 @error('foto') is-invalid @enderror" accept="image/*">
                         @error('foto')<div class="invalid-feedback">{{ $message }}</div>@enderror
+                    </div>
+                    {{-- OFERTA --}}
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" name="en_oferta" id="en_oferta" value="1"
+                                   {{ old('en_oferta', $vehiculo->en_oferta) ? 'checked' : '' }}
+                                   onchange="document.getElementById('campoOferta').style.display=this.checked?'block':'none'">
+                            <label class="form-check-label fw-semibold" for="en_oferta">🔥 Marcar como oferta</label>
+                        </div>
+                    </div>
+                    <div class="mb-3" id="campoOferta" style="display:{{ old('en_oferta', $vehiculo->en_oferta) ? 'block' : 'none' }}">
+                        <label class="form-label">Precio de oferta (S/.)</label>
+                        <input type="number" name="precio_oferta" step="0.01" min="0"
+                               class="form-control rounded-3"
+                               value="{{ old('precio_oferta', $vehiculo->precio_oferta) }}">
                     </div>
                     <div class="d-flex gap-2">
                         <button type="submit" class="btn btn-warning">Actualizar</button>

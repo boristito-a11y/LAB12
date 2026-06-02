@@ -32,16 +32,18 @@ class VehiculoController extends Controller
             'marca_id'    => 'required|exists:marcas,id',
             'foto'        => 'nullable|image|mimes:jpg,jpeg,png,gif|max:2048',
         ], [
-            'modelo.required'   => 'El modelo es obligatorio.',
-            'anio.required'     => 'El año es obligatorio.',
-            'precio.required'   => 'El precio es obligatorio.',
+            'modelo.required'      => 'El modelo es obligatorio.',
+            'anio.required'        => 'El año es obligatorio.',
+            'precio.required'      => 'El precio es obligatorio.',
             'kilometraje.required' => 'El kilometraje es obligatorio.',
-            'marca_id.required' => 'Debes seleccionar una marca.',
-            'foto.image'        => 'El archivo debe ser una imagen.',
-            'foto.mimes'        => 'Solo se permiten imágenes jpg, jpeg, png o gif.',
+            'marca_id.required'    => 'Debes seleccionar una marca.',
+            'foto.image'           => 'El archivo debe ser una imagen.',
+            'foto.mimes'           => 'Solo se permiten imágenes jpg, jpeg, png o gif.',
         ]);
 
         $datos = $request->only('modelo', 'anio', 'precio', 'kilometraje', 'marca_id');
+        $datos['en_oferta']     = $request->has('en_oferta');
+        $datos['precio_oferta'] = $request->has('en_oferta') ? $request->precio_oferta : null;
 
         if ($request->hasFile('foto')) {
             $datos['foto'] = $request->file('foto')->store('vehiculos', 'public');
@@ -84,8 +86,10 @@ class VehiculoController extends Controller
             'foto.image'           => 'El archivo debe ser una imagen.',
             'foto.mimes'           => 'Solo se permiten imágenes jpg, jpeg, png o gif.',
         ]);
-        
+
         $datos = $request->only('modelo', 'anio', 'precio', 'kilometraje', 'stock', 'marca_id');
+        $datos['en_oferta']     = $request->has('en_oferta');
+        $datos['precio_oferta'] = $request->has('en_oferta') ? $request->precio_oferta : null;
 
         if ($request->hasFile('foto')) {
             if ($vehiculo->foto) {
@@ -108,5 +112,21 @@ class VehiculoController extends Controller
         $vehiculo->delete();
         return redirect()->route('admin.vehiculos.index')
             ->with('success', 'Vehículo eliminado correctamente.');
+    }
+
+    public function reajustar(Request $request, Vehiculo $vehiculo)
+    {
+        $request->validate(['stock' => 'required|integer|min:0']);
+        $vehiculo->update(['stock' => $request->stock]);
+        return redirect()->route('admin.dashboard')
+            ->with('success', 'Stock de ' . $vehiculo->modelo . ' actualizado.');
+    }
+
+    // NUEVO: Exportar PDF
+    public function exportarPdf()
+    {
+        $vehiculos = Vehiculo::with('marca')->get();
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('admin.vehiculos.pdf', compact('vehiculos'));
+        return $pdf->download('vehiculos-' . now()->format('Y-m-d') . '.pdf');
     }
 }

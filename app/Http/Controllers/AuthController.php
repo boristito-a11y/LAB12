@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\CarritoItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 
 class AuthController extends Controller
 {
@@ -26,57 +26,56 @@ class AuthController extends Controller
 
         if (Auth::attempt($request->only('email', 'password'))) {
             $request->session()->regenerate();
-            $user = auth()->user();
 
-            // Restaurar carrito guardado en DB a la sesión
-            if (!$user->esAdmin()) {
-                $key = 'carrito_' . $user->id;
-                $items = CarritoItem::where('user_id', $user->id)->with('vehiculo.marca')->get();
-                $carrito = [];
-                foreach ($items as $item) {
-                    $v = $item->vehiculo;
-                    if ($v) {
-                        $carrito[$v->id] = [
-                            'id'       => $v->id,
-                            'nombre'   => $v->modelo . ' ' . $v->marca->nombre,
-                            'precio'   => $v->precio,
-                            'cantidad' => $item->cantidad,
-                            'foto'     => $v->foto,
-                            'stock'    => $v->stock,
-                        ];
-                    }
-                }
-                session()->put($key, $carrito);
+            if (auth()->user()->esAdmin()) {
+                return redirect()->route('admin.dashboard');
             }
-
-            return redirect()->route($user->esAdmin() ? 'admin.marcas.index' : 'usuario.vehiculos.index');
+            return redirect()->route('usuario.vehiculos.index');
         }
 
-        return back()->withErrors(['email' => 'Las credenciales no son correctas.'])->withInput($request->only('email'));
+        return back()->withErrors([
+            'email' => 'Las credenciales no son correctas.',
+        ])->withInput($request->only('email'));
     }
 
     public function logout(Request $request)
     {
-        $user = auth()->user();
-
-        // Guardar carrito en DB antes de cerrar sesión
-        if ($user && !$user->esAdmin()) {
-            $key = 'carrito_' . $user->id;
-            $carrito = session()->get($key, []);
-
-            CarritoItem::where('user_id', $user->id)->delete();
-            foreach ($carrito as $vehiculoId => $item) {
-                CarritoItem::create([
-                    'user_id'     => $user->id,
-                    'vehiculo_id' => $vehiculoId,
-                    'cantidad'    => $item['cantidad'],
-                ]);
-            }
-        }
-
         Auth::logout();
         $request->session()->invalidate();
         $request->session()->regenerateToken();
         return redirect()->route('login');
+    }
+
+    public function showRegistro()
+    {
+        return view('auth.registro');
+    }
+
+    public function registro(Request $request)
+    {
+        $request->validate([
+            'name'     => 'required|string|min:2|max:100',
+            'email'    => 'required|email|unique:users,email',
+            'password' => 'required|min:8|confirmed',
+        ], [
+            'name.required'      => 'El nombre es obligatorio.',
+            'name.min'           => 'El nombre debe tener al menos 2 caracteres.',
+            'email.required'     => 'El correo es obligatorio.',
+            'email.unique'       => 'Este correo ya está registrado.',
+            'password.required'  => 'La contraseña es obligatoria.',
+            'password.min'       => 'La contraseña debe tener al menos 8 caracteres.',
+            'password.confirmed' => 'Las contraseñas no coinciden.',
+        ]);
+
+        $user = \App\Models\User::create([
+            'name'     => $request->name,
+            'email'    => $request->email,
+            'password' => Hash::make($request->password),
+            'rol'      => 'usuario',
+        ]);
+
+        Auth::login($user);
+        return redirect()->route('usuario.vehiculos.index')
+            ->with('success', '¡Bienvenido ' . $user->name . '!');
     }
 }

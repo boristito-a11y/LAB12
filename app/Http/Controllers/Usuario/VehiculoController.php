@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Usuario;
 use App\Http\Controllers\Controller;
 use App\Models\Vehiculo;
 use App\Models\Marca;
+use App\Models\Favorito;
 use Illuminate\Http\Request;
 
 class VehiculoController extends Controller
@@ -33,8 +34,11 @@ class VehiculoController extends Controller
             };
         }
 
-        $vehiculos = $query->get();
-        return view('usuario.vehiculos.index', compact('vehiculos', 'marcas'));
+        $vehiculos    = $query->get();
+        $favoritosIds = Favorito::where('user_id', auth()->id())
+                        ->pluck('vehiculo_id')->toArray();
+
+        return view('usuario.vehiculos.index', compact('vehiculos', 'marcas', 'favoritosIds'));
     }
 
     public function show(Vehiculo $vehiculo)
